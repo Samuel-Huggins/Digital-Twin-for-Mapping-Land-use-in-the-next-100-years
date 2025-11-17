@@ -1,0 +1,15 @@
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+
+# Data and results
+data/
+results/
+simulation/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
