@@ -5,14 +5,12 @@ import os
 @dataclass(frozen=True)
 class Config:
     # Global toggle (one place to switch)
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # Earth Engine
     EE_PROJECT: str = "digitaltwin-478518"
 
-    # Time window for compositing
-    START_DATE: str = "2020-01-01"
-    END_DATE: str = "2020-12-31"
+    YEARS: tuple[int,...] = (2020, 2021, 2022, 2023, 2024)
 
     # Sampling
     POINTS_PER_CLASS: int = 500
@@ -21,8 +19,8 @@ class Config:
 
     # Drive export
     EXPORT_FOLDER: str = "GEE_Exports"
-    EXPORT_DESC: str = "L8_WorldCover_EastAnglia_2020_Samples"
-    EXPORT_PREFIX: str = "EastAnglia2020_WorldCover_Samples"
+    EXPORT_DESC: str = "L8_WorldCover_EastAnglia_Samples"
+    EXPORT_PREFIX: str = "EastAnglia_WorldCover_Samples"
 
     # ROI export (only used when DEBUG=True)
     ROI_EXPORT_DESC: str = "EastAnglia_ROI_debug"
@@ -44,7 +42,6 @@ class Config:
     DROP_COLS_CONTAINING: tuple[str, ...] = (".geo", "system:index")
 
     # Training hyperparams
-    SEED: int = 42
     TEST_SIZE: float = 0.2
     VAL_SPLIT: float = 0.2
     EPOCHS: int = 20
