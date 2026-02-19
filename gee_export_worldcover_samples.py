@@ -8,14 +8,29 @@ ee.Authenticate()
 ee.Initialize(project = PROJECT)
 print("Earth Engine Initialised")
 
-# Region of Interest - London
-ROI = ee.Geometry.Rectangle([-0.35, 51.40, 0.10, 51.65])
+# --- ROI: Norfolk + Suffolk (administrative boundaries) ---
+admin2 = ee.FeatureCollection("FAO/GAUL/2015/level2")
+
+uk_admin2 = admin2.filter(ee.Filter.eq("ADM0_NAME", "U.K. of Great Britain and Northern Ireland"))
+
+norfolk = uk_admin2.filter(ee.Filter.eq("ADM2_NAME", "Norfolk"))
+suffolk = uk_admin2.filter(ee.Filter.eq("ADM2_NAME", "Suffolk"))
+
+print("Norfolk area (km^2):", norfolk.geometry().area().divide(1e6).getInfo())
+print("Suffolk area (km^2):", suffolk.geometry().area().divide(1e6).getInfo())
+
+ROI = norfolk.merge(suffolk).geometry()
+
+print("Using ROI: Norfolk + Suffolk (GAUL admin2)")
+print("ROI area (km^2):", ROI.area().divide(1e6).getInfo())
+print("ROI bounds:", ROI.bounds().getInfo())
+
 #Samples per class (stratified)
 POINTS_PER_CLASS = 500
 
 EXPORT_FOLDER = "GEE_Exports"
-EXPORT_DESC = "L8_WorldCover_London_2020_Samples"
-EXPORT_PREFIX = "London2020_WorldCover_Samples"
+EXPORT_DESC = "L8_WorldCover_EastAnglia_2020_Samples"
+EXPORT_PREFIX = "EastAnglia2020_WorldCover_Samples"
 
 def mask_l8_sr(image):
     qa = image.select("QA_PIXEL")
@@ -45,6 +60,45 @@ count = l8.size().getInfo()
 print(f"Images after filtering: {count}")
 
 composite = l8.median().clip(ROI)
+
+# ----------------------------------
+# Visualise and export ROI outline
+# ----------------------------------
+
+# Create ROI boundary image
+roi_outline = ee.Image().byte().paint(
+    featureCollection=ee.FeatureCollection(ROI),
+    color=1,
+    width=3
+)
+
+# Create RGB visualisation of composite
+rgb_vis = composite.select(['SR_B4', 'SR_B3', 'SR_B2']).visualize(
+    min=0.0,
+    max=0.3
+)
+
+# Blend composite with ROI outline
+combined = rgb_vis.blend(
+    roi_outline.visualize(palette=['red'])
+)
+
+# Export to Google Drive
+task = ee.batch.Export.image.toDrive(
+    image=combined,
+    description='EastAnglia_ROI',
+    folder='GEE_Exports',
+    fileNamePrefix='L8SR_EastAnglia_ROI',
+    region=ROI,
+    scale=30,
+    maxPixels=1e13
+)
+
+task.start()
+
+print("ROI visualisation export started.")
+print("Task status:", task.status())
+
 
 # Landsat 8 bands:
 # SR_B2 blue, SR_B3 green, SR_B4 red, SR_B5 nir, SR_B6 swir1, SR_B7 swir2

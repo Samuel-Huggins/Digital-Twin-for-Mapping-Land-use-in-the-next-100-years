@@ -17,7 +17,7 @@ models = tf.keras.models
 # -----------------------------
 # Config
 # -----------------------------
-CSV_PATH = os.path.join(PROJECT_ROOT, "data", "London2020_WorldCover_Samples.csv")
+CSV_PATH = os.path.join(PROJECT_ROOT, "data", "EastAnglia2020_WorldCover_Samples.csv")
 LABEL_COL = "label"
 
 # Keep it simple: use all numeric feature columns except label
