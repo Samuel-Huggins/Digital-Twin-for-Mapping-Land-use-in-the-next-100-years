@@ -1,4 +1,12 @@
 import os
+import sys
+
+# Ensure project root is on Python path
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
+from config import CFG
 import random
 import numpy as np
 import pandas as pd
