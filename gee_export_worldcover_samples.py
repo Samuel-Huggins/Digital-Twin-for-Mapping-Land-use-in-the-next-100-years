@@ -20,7 +20,7 @@ from landsat import get_annual_landsat_composite
 # -----------------------------
 # Init Earth Engine
 # -----------------------------
-ee.Authenticate()
+# ee.Authenticate()
 ee.Initialize(project=CFG.EE_PROJECT)
 print("Earth Engine Initialised")
 

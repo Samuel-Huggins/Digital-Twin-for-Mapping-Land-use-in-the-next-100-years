@@ -6,6 +6,7 @@ import os
 class Config:
     # Global toggle (one place to switch)
     DEBUG: bool = False
+    FAIL_ON_MISSING_LABELS: bool = True
 
     # Earth Engine
     EE_PROJECT: str = "digitaltwin-478518"
@@ -37,7 +38,7 @@ class Config:
     RESULTS_DIR: str = os.path.join(PROJECT_ROOT, "results")
 
     # Training data
-    TRAIN_CSV: str = os.path.join(DATA_DIR, "EastAnglia2020_WorldCover_Samples.csv")
+    TRAIN_CSV: str = os.path.join(DATA_DIR, "EastAnglia_WorldCover_Samples_2024.csv")
     LABEL_COL: str = "label"
     DROP_COLS_CONTAINING: tuple[str, ...] = (".geo", "system:index")
 
