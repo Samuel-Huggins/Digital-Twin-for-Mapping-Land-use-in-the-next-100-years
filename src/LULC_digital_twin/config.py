@@ -36,7 +36,7 @@ class Config:
     EE_PROJECT: str = os.getenv("EE_PROJECT", "digitaltwin-478518")
     EXPORT_FOLDER: str = os.getenv("GEE_EXPORT_FOLDER", "GEE_Exports")
 
-    YEARS: tuple[int, ...] = (2020, 2021, 2022, 2023, 2024)
+    YEARS: tuple[int, ...] = (2020, 2021)
 
     # Sampling
     POINTS_PER_CLASS: int = int(os.getenv("POINTS_PER_CLASS", "500"))
@@ -63,7 +63,7 @@ class Config:
 
     # Training data (default points at latest year; you can override via env if needed)
     TRAIN_CSV: Path = Path(
-        os.getenv("TRAIN_CSV", str(DATA_DIR / "EastAnglia_WorldCover_Samples_2024.csv"))
+        os.getenv("TRAIN_CSV", str(DATA_DIR / "EastAnglia_WorldCover_Samples_2021.csv"))
     )
     LABEL_COL: str = "label"
     DROP_COLS_CONTAINING: tuple[str, ...] = (".geo", "system:index")

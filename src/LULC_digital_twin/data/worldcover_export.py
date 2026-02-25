@@ -1,4 +1,4 @@
-# gee_export_worldcover_samples.py
+#worldcover_export.py
 """
 Exports stratified WorldCover-labelled samples for a Landsat annual composite over the configured ROI.
 """
@@ -41,6 +41,9 @@ def main() -> int:
     # Init Earth Engine
     # -
     # ee.Authenticate()
+    if CFG.FAIL_ON_MISSING_LABELS:
+        print("FAIL_ON_MISSING_LABELS=True → Only years with ESA WorldCover labels (2020=v100, 2021=v200) are allowed.")
+
     ee.Initialize(project=CFG.EE_PROJECT)
     print("Earth Engine Initialised")
 
@@ -112,13 +115,23 @@ def main() -> int:
 
         features = composite.addBands([ndvi, ndbi, ndwi])
 
-        # -
-        # Labels (ESA WorldCover) + stratified sampling
-        # -
-        worldcover = ee.ImageCollection("ESA/WorldCover/v200").first().select("Map")
+        # --- Labels (ESA WorldCover) ---
+        if year == 2020:
+            # v100 contains 2020 (ImageCollection -> take the first image)
+            worldcover = ee.ImageCollection("ESA/WorldCover/v100").first().select("Map")
+        elif year == 2021:
+            # v200 contains 2021 (ImageCollection -> take the first image)
+            worldcover = ee.ImageCollection("ESA/WorldCover/v200").first().select("Map")
+        else:
+            if CFG.FAIL_ON_MISSING_LABELS:
+                raise ValueError(
+                    f"No ESA WorldCover labels available in v100/v200 for YEAR={year}. "
+                    "WorldCover in EE covers 2020 (v100) and 2021 (v200)."
+                )
+            continue  # if you ever allow skipping
 
         labels = (
-            worldcover.rename("label")
+            worldcover.rename("label")   # <-- use rename, NOT name()
             .reduceResolution(reducer=ee.Reducer.mode(), maxPixels=1024)
             .reproject(crs="EPSG:4326", scale=CFG.SCALE_M)
             .clip(ROI)
