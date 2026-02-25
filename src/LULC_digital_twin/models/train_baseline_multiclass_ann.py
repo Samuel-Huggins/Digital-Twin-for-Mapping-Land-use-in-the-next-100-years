@@ -1,12 +1,7 @@
 import os
 import sys
 
-# Ensure project root is on Python path
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
-
-from config import CFG
+from LULC_digital_twin.config import CFG
 import random
 import numpy as np
 import pandas as pd
@@ -17,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix
 
 import tensorflow as tf
-from config import CFG
+from LULC_digital_twin.config import CFG
 
 layers = tf.keras.layers
 models = tf.keras.models

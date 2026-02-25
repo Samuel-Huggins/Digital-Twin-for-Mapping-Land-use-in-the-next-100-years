@@ -1,15 +1,31 @@
-# Python virtual environment
+# ---- Virtual envs ----
+.venv/
 venv/
+
+# ---- Python cache ----
 __pycache__/
 *.pyc
 
-# Data and results
+# ---- Local data + exports (DO NOT COMMIT) ----
 data/
 results/
-simulation/
+exports/
+outputs/
 
-# Jupyter checkpoints
-.ipynb_checkpoints/
-
-# Logs
+# Common generated artifacts
+*.csv
+*.tif
+*.tiff
+*.geotiff
+*.png
+*.jpg
+*.jpeg
 *.log
+*.keras
+*.h5
+*.pt
+*.pkl
+*.joblib
+
+# ---- Jupyter ----
+.ipynb_checkpoints/

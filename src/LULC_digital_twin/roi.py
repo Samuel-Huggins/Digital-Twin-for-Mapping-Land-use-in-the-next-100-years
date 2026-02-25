@@ -4,7 +4,7 @@ import ee
 from dataclasses import dataclass
 from typing import Dict, Tuple, List
 
-from config import CFG
+from LULC_digital_twin.config import CFG
 
 @dataclass(frozen=True)
 class ROIMeta:
