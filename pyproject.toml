@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "digital-twin-for-mapping-land-use-in-the-next-100-years"
+version = "0.1.0"
+description = "Final-Year Project: Digital Twin for Land Use Mapping & Forecasting"
+authors = ["Samuel Huggins"]
+readme = "README.md"
+packages = [{ include = "LULC_digital_twin", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+tensorflow = "2.20.0"
+numpy = "^2.4.2"
+pandas = "^3.0.1"
+scikit-learn = "^1.8.0"
+matplotlib = "^3.10.8"
+seaborn = "^0.13.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
