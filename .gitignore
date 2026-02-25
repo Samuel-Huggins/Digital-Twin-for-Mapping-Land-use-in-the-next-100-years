@@ -1,13 +1,14 @@
-# ---- Virtual envs ----
+.env
+
+# Virtual envs 
 .venv/
 venv/
 
-# ---- Python cache ----
+# Python cache
 __pycache__/
 *.pyc
 
-# ---- Local data + exports (DO NOT COMMIT) ----
-data/
+# Local data + exports
 results/
 exports/
 outputs/
@@ -27,5 +28,5 @@ outputs/
 *.pkl
 *.joblib
 
-# ---- Jupyter ----
+# Jupyter 
 .ipynb_checkpoints/
