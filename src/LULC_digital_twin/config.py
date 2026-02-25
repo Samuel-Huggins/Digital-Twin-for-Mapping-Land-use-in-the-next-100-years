@@ -29,7 +29,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 @dataclass(frozen=True)
 class Config:
     # Global toggle
-    DEBUG: bool = _bool_env("DEBUG", False)
+    DEBUG: bool = _bool_env("DEBUG", True)
     FAIL_ON_MISSING_LABELS: bool = _bool_env("FAIL_ON_MISSING_LABELS", True)
 
     # Earth Engine
@@ -63,7 +63,7 @@ class Config:
 
     # Training data (default points at latest year; you can override via env if needed)
     TRAIN_CSV: Path = Path(
-        os.getenv("TRAIN_CSV", str(DATA_DIR / "EastAnglia_WorldCover_Samples_2021.csv"))
+        os.getenv("TRAIN_CSV", str(DATA_DIR / "EastAnglia_WorldCover_Samples_2021_Post.csv"))
     )
     LABEL_COL: str = "label"
     DROP_COLS_CONTAINING: tuple[str, ...] = (".geo", "system:index")

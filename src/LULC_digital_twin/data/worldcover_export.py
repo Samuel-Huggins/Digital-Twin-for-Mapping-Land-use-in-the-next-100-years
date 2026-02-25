@@ -74,11 +74,11 @@ def main() -> int:
 
     for year in tqdm(CFG.YEARS, desc="Submitting EE exports"):
         composite = get_annual_landsat_composite(year, ROI, debug=CFG.DEBUG)
-
         # -
         # Debug-only: export quick ROI overlay TIFF
         # -
         if CFG.DEBUG:
+            print("Composite bands:", composite.bandNames().getInfo())
             roi_fc = ee.FeatureCollection([ee.Feature(ROI)])
 
             rgb_vis = composite.select(["RED", "GREEN", "BLUE"]).visualize(min=0.0, max=0.3)
@@ -101,19 +101,32 @@ def main() -> int:
             tasks.append(debug_task)
             print(f"{year}: DEBUG TIFF task started -> {debug_task.status().get('state')}")
 
-        # -
         # Feature engineering (bands + indices)
-        # -
+        blue = composite.select("BLUE")
         green = composite.select("GREEN")
         red = composite.select("RED")
         nir = composite.select("NIR")
         swir1 = composite.select("SWIR1")
 
-        ndvi = nir.subtract(red).divide(nir.add(red)).rename("NDVI")
-        ndbi = swir1.subtract(nir).divide(swir1.add(nir)).rename("NDBI")
-        ndwi = green.subtract(nir).divide(green.add(nir)).rename("NDWI")
+        # Small epsilon to avoid divide-by-zero edge cases
+        eps = ee.Image.constant(1e-6)
 
-        features = composite.addBands([ndvi, ndbi, ndwi])
+        # Existing indices
+        ndvi = nir.subtract(red).divide(nir.add(red).add(eps)).rename("NDVI")
+        ndbi = swir1.subtract(nir).divide(swir1.add(nir).add(eps)).rename("NDBI")
+        ndwi = green.subtract(nir).divide(green.add(nir).add(eps)).rename("NDWI")
+
+        # New: Normalised Difference Moisture Index (NDMI)
+        # Moisture in vegetation/land (helps wetlands + crop moisture separation)
+        ndmi = nir.subtract(swir1).divide(nir.add(swir1).add(eps)).rename("NDMI")
+
+        # New: Bare Soil Index (BSI)
+        # Exposed soil/bare ground signal (helps bare vs cropland vs built-up edges)
+        bsi_num = (swir1.add(red)).subtract(nir.add(blue))
+        bsi_den = (swir1.add(red)).add(nir.add(blue)).add(eps)
+        bsi = bsi_num.divide(bsi_den).rename("BSI")
+
+        features = composite.addBands([ndvi, ndbi, ndwi, ndmi, bsi])
 
         # --- Labels (ESA WorldCover) ---
         if year == 2020:
