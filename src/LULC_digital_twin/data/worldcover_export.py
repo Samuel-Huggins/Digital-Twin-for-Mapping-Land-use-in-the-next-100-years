@@ -35,13 +35,62 @@ def wait_for_tasks(tasks: list[ee.batch.Task], poll_s: int = 30) -> None:
             if remaining:
                 time.sleep(poll_s)
 
+def get_road_distance_bands(roi: ee.Geometry, max_distance_m: int = 7_500) -> ee.Image:
+    """
+    Creates road proximity feature bands for the ROI.
+
+    DIST_ROADS_M:
+        Distance in metres to the nearest road, capped at max_distance_m.
+
+    DIST_ROADS_LOG:
+        log1p(DIST_ROADS_M), used as the ML-friendly version because distance
+        values are usually highly skewed.
+
+    Note:
+        Earth Engine distance kernels have a max pixel size of 512.
+        At 30 m scale, 10,000 m creates a ~667 pixel kernel, so 7,500 m
+        is used to stay below the limit.
+    """
+
+    roads = (
+        ee.FeatureCollection("projects/sat-io/open-datasets/GRIP4/Europe")
+        .filterBounds(roi)
+    )
+
+    road_mask = (
+        ee.Image(0)
+        .byte()
+        .paint(featureCollection=roads, color=1)
+        .selfMask()
+        .clip(roi)
+    )
+
+    dist_roads_m = (
+        road_mask
+        .distance(ee.Kernel.euclidean(max_distance_m, "meters"))
+        .rename("DIST_ROADS_M")
+        .unmask(max_distance_m)
+        .toFloat()
+        .clip(roi)
+    )
+
+    dist_roads_log = (
+        dist_roads_m
+        .add(1)
+        .log()
+        .rename("DIST_ROADS_LOG")
+        .toFloat()
+        .clip(roi)
+    )
+
+    return dist_roads_m.addBands(dist_roads_log)
 
 def main() -> int:
     # -
     # Init Earth Engine
     # -
     # ee.Authenticate()
-    EXPERIMENT_TAG = "with_slope"
+    EXPERIMENT_TAG = "with_slope_and_roads"
     if CFG.FAIL_ON_MISSING_LABELS:
         print("FAIL_ON_MISSING_LABELS=True → Only years with ESA WorldCover labels (2020=v100, 2021=v200) are allowed.")
 
@@ -133,7 +182,20 @@ def main() -> int:
         dem = ee.Image("USGS/SRTMGL1_003").select("elevation").clip(ROI)
         slope = ee.Terrain.slope(dem).rename("SLOPE").toFloat()
 
-        features = composite.addBands([ndvi, ndbi, ndwi, ndmi, bsi, slope])
+        # New: Road proximity from GRIP4 Europe
+        # Static infrastructure feature. This gives the classifier spatial context
+        # linked to accessibility, urban pressure and human land-use patterns.
+        road_distance = get_road_distance_bands(ROI)
+
+        features = composite.addBands([
+            ndvi,
+            ndbi,
+            ndwi,
+            ndmi,
+            bsi,
+            slope,
+            road_distance,
+        ])
 
         if CFG.DEBUG:
             print("Feature bands:", features.bandNames().getInfo())

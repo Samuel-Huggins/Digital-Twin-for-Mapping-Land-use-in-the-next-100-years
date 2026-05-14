@@ -65,8 +65,17 @@ def main() -> int:
     df = df.drop(columns=drop_cols, errors="ignore")
     df = df.dropna()
 
+    # Use all exported features except label and raw road distance.
+    # DIST_ROADS_LOG is kept because it is numerically better behaved for ANN training.
+    feature_df = df.drop(columns=[CFG.LABEL_COL], errors="ignore")
+    feature_df = feature_df.drop(columns=["DIST_ROADS_M"], errors="ignore")
+
     y_raw = df[CFG.LABEL_COL].astype(int).values
-    X = df.drop(columns=[CFG.LABEL_COL]).values
+    X = feature_df.values
+
+    if CFG.DEBUG:
+        print("Feature columns:", list(feature_df.columns))
+        print("Feature count:", X.shape[1])
 
     # Map WC codes -> contiguous class IDs
     unique_codes = sorted(np.unique(y_raw).tolist())
@@ -135,7 +144,7 @@ def main() -> int:
     # Output directory
     # -----------------------------
     year_tag = train_csv.stem.split("_")[-1]
-    EXPERIMENT_TAG = "with_slope"
+    EXPERIMENT_TAG = "with_slope_and_roads"
     out_dir = CFG.RESULTS_DIR / EXPERIMENT_TAG / year_tag
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -155,7 +164,7 @@ def main() -> int:
     # Confusion matrix (counts)
     plt.figure(figsize=(8, 7))
     plt.imshow(cm)
-    plt.title("Baseline ANN Confusion Matrix")
+    plt.title("ANN Confusion Matrix")
     plt.colorbar()
     plt.xticks(tick_marks, class_names, rotation=45, ha="right")
     plt.yticks(tick_marks, class_names)
@@ -167,7 +176,7 @@ def main() -> int:
             plt.text(j, i, str(cm[i, j]), ha="center", va="center")
 
     plt.tight_layout()
-    plt.savefig(out_dir / "confusion_matrix_baseline.png", dpi=300)
+    plt.savefig(out_dir / "confusion_matrix.png", dpi=300)
     plt.close()
 
     # Training curves
@@ -176,7 +185,7 @@ def main() -> int:
     plt.plot(history.history["val_loss"], label="Val loss")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(out_dir / "training_loss_baseline.png", dpi=300)
+    plt.savefig(out_dir / "training_loss.png", dpi=300)
     plt.close()
 
     plt.figure()
@@ -184,7 +193,7 @@ def main() -> int:
     plt.plot(history.history["val_accuracy"], label="Val accuracy")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(out_dir / "training_accuracy_baseline.png", dpi=300)
+    plt.savefig(out_dir / "training_accuracy.png", dpi=300)
     plt.close()
 
     # Save model + class codes

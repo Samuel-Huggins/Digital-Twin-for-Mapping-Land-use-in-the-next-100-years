@@ -76,7 +76,7 @@ class Config:
     LR: float = float(os.getenv("LR", "0.001"))
 
     # Output filenames
-    MODEL_FILENAME: str = os.getenv("MODEL_FILENAME", "baseline_ann_worldcover.keras")
+    MODEL_FILENAME: str = os.getenv("MODEL_FILENAME", "ann_worldcover.keras")
     CODES_FILENAME: str = os.getenv("CODES_FILENAME", "worldcover_codes_used.csv")
 
 
