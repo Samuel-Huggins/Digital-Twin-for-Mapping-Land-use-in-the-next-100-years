@@ -41,6 +41,7 @@ def main() -> int:
     # Init Earth Engine
     # -
     # ee.Authenticate()
+    EXPERIMENT_TAG = "with_slope"
     if CFG.FAIL_ON_MISSING_LABELS:
         print("FAIL_ON_MISSING_LABELS=True → Only years with ESA WorldCover labels (2020=v100, 2021=v200) are allowed.")
 
@@ -85,8 +86,8 @@ def main() -> int:
             roi_outline = ee.Image().byte().paint(roi_fc, 1, 3).visualize(palette=["FF0000"])
             debug_img = rgb_vis.blend(roi_outline)
 
-            debug_desc = f"{CFG.ROI_EXPORT_DESC}_{year}"
-            debug_prefix = f"{CFG.ROI_EXPORT_PREFIX}_{year}"
+            debug_desc = f"{CFG.ROI_EXPORT_DESC}_{EXPERIMENT_TAG}_{year}"
+            debug_prefix = f"{CFG.ROI_EXPORT_PREFIX}_{EXPERIMENT_TAG}_{year}"
 
             debug_task = ee.batch.Export.image.toDrive(
                 image=debug_img,
@@ -126,8 +127,16 @@ def main() -> int:
         bsi_den = (swir1.add(red)).add(nir.add(blue)).add(eps)
         bsi = bsi_num.divide(bsi_den).rename("BSI")
 
-        features = composite.addBands([ndvi, ndbi, ndwi, ndmi, bsi])
+        # New: Terrain slope from SRTM DEM
+        # Static physical terrain feature, useful because land use is constrained
+        # by gradient/suitability as well as spectral surface appearance.
+        dem = ee.Image("USGS/SRTMGL1_003").select("elevation").clip(ROI)
+        slope = ee.Terrain.slope(dem).rename("SLOPE").toFloat()
 
+        features = composite.addBands([ndvi, ndbi, ndwi, ndmi, bsi, slope])
+
+        if CFG.DEBUG:
+            print("Feature bands:", features.bandNames().getInfo())
         # --- Labels (ESA WorldCover) ---
         if year == 2020:
             # v100 contains 2020 (ImageCollection -> take the first image)
@@ -164,8 +173,8 @@ def main() -> int:
         # -
         # Export CSV (always)
         # -
-        csv_desc = f"{CFG.EXPORT_DESC}_{year}"
-        csv_prefix = f"{CFG.EXPORT_PREFIX}_{year}"
+        csv_desc = f"{CFG.EXPORT_DESC}_{EXPERIMENT_TAG}_{year}"
+        csv_prefix = f"{CFG.EXPORT_PREFIX}_{EXPERIMENT_TAG}_{year}"
 
         csv_task = ee.batch.Export.table.toDrive(
             collection=samples,

@@ -135,7 +135,8 @@ def main() -> int:
     # Output directory
     # -----------------------------
     year_tag = train_csv.stem.split("_")[-1]
-    out_dir = CFG.RESULTS_DIR / year_tag
+    EXPERIMENT_TAG = "with_slope"
+    out_dir = CFG.RESULTS_DIR / EXPERIMENT_TAG / year_tag
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # -----------------------------
