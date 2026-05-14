@@ -90,7 +90,7 @@ def main() -> int:
     # Init Earth Engine
     # -
     # ee.Authenticate()
-    EXPERIMENT_TAG = "with_slope_and_roads"
+    EXPERIMENT_TAG = "with_slope_roads_and_water"
     if CFG.FAIL_ON_MISSING_LABELS:
         print("FAIL_ON_MISSING_LABELS=True → Only years with ESA WorldCover labels (2020=v100, 2021=v200) are allowed.")
 
@@ -187,6 +187,31 @@ def main() -> int:
         # linked to accessibility, urban pressure and human land-use patterns.
         road_distance = get_road_distance_bands(ROI)
 
+
+        # New: Distance to persistent surface water
+        # Uses JRC Global Surface Water occurrence.
+        # occurrence is 0-100, where higher values indicate more frequent historical water presence.
+        gsw = ee.Image("JRC/GSW1_4/GlobalSurfaceWater")
+        water_occurrence = gsw.select("occurrence").unmask(0).clip(ROI)
+
+        # Persistent water mask. 80 means water was observed in at least 80% of valid observations.
+        persistent_water = water_occurrence.gte(80).selfMask()
+
+        # Distance from each pixel to nearest persistent water pixel, in metres.
+        # fastDistanceTransform gives squared distance in pixels, so sqrt() * scale gives metres.
+        dist_water_m = (
+            persistent_water
+            .fastDistanceTransform(neighborhood=1024, units="pixels")
+            .sqrt()
+            .multiply(CFG.SCALE_M)
+            .rename("DIST_WATER_M")
+            .toFloat()
+            .clip(ROI)
+        )
+
+        # Also keep occurrence itself as a contextual hydrology feature.
+        water_occurrence = water_occurrence.rename("WATER_OCCURRENCE").toFloat()
+
         features = composite.addBands([
             ndvi,
             ndbi,
@@ -195,6 +220,8 @@ def main() -> int:
             bsi,
             slope,
             road_distance,
+            dist_water_m,
+            water_occurrence,
         ])
 
         if CFG.DEBUG:
