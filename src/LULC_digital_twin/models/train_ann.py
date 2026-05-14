@@ -144,7 +144,7 @@ def main() -> int:
     # Output directory
     # -----------------------------
     year_tag = train_csv.stem.split("_")[-1]
-    EXPERIMENT_TAG = "with_slope_roads_water_elevation_tpi"
+    EXPERIMENT_TAG = "post_indices"
     out_dir = CFG.RESULTS_DIR / EXPERIMENT_TAG / year_tag
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -164,7 +164,7 @@ def main() -> int:
     # Confusion matrix (counts)
     plt.figure(figsize=(8, 7))
     plt.imshow(cm)
-    plt.title("ANN Confusion Matrix: Slope + Roads + Water + Elevation + TPI")
+    plt.title("ANN Confusion Matrix: Post-Indices")
     plt.colorbar()
     plt.xticks(tick_marks, class_names, rotation=45, ha="right")
     plt.yticks(tick_marks, class_names)
@@ -176,7 +176,7 @@ def main() -> int:
             plt.text(j, i, str(cm[i, j]), ha="center", va="center")
 
     plt.tight_layout()
-    plt.savefig(out_dir / "confusion_matrix_slope_roads_water_elevation_tpi.png", dpi=300)
+    plt.savefig(out_dir / "confusion_matrix_post_indices.png", dpi=300)
     plt.close()
 
     # Training curves
@@ -185,7 +185,7 @@ def main() -> int:
     plt.plot(history.history["val_loss"], label="Val loss")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(out_dir / "training_loss_slope_roads_water_elevation_tpi.png", dpi=300)
+    plt.savefig(out_dir / "training_loss_post_indices.png", dpi=300)
     plt.close()
 
     plt.figure()
@@ -193,7 +193,7 @@ def main() -> int:
     plt.plot(history.history["val_accuracy"], label="Val accuracy")
     plt.legend()
     plt.tight_layout()
-    plt.savefig(out_dir / "training_accuracy_slope_roads_water_elevation_tpi.png", dpi=300)
+    plt.savefig(out_dir / "training_accuracy_post_indices.png", dpi=300)
     plt.close()
 
     # Save model + class codes
