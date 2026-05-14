@@ -1,6 +1,13 @@
-#worldcover_export.py
+# worldcover_export.py
 """
 Exports stratified WorldCover-labelled samples for a Landsat annual composite over the configured ROI.
+
+Feature stages included in this version:
+- Landsat reflectance bands
+- Spectral indices: NDVI, NDBI, NDWI, NDMI, BSI
+- Terrain context: ELEVATION, SLOPE, TPI_300M
+- Infrastructure context: DIST_ROADS_M, DIST_ROADS_LOG
+- Hydrological context: DIST_WATER_M, WATER_OCCURRENCE
 """
 
 from __future__ import annotations
@@ -35,6 +42,7 @@ def wait_for_tasks(tasks: list[ee.batch.Task], poll_s: int = 30) -> None:
             if remaining:
                 time.sleep(poll_s)
 
+
 def get_road_distance_bands(roi: ee.Geometry, max_distance_m: int = 7_500) -> ee.Image:
     """
     Creates road proximity feature bands for the ROI.
@@ -51,7 +59,6 @@ def get_road_distance_bands(roi: ee.Geometry, max_distance_m: int = 7_500) -> ee
         At 30 m scale, 10,000 m creates a ~667 pixel kernel, so 7,500 m
         is used to stay below the limit.
     """
-
     roads = (
         ee.FeatureCollection("projects/sat-io/open-datasets/GRIP4/Europe")
         .filterBounds(roi)
@@ -85,20 +92,113 @@ def get_road_distance_bands(roi: ee.Geometry, max_distance_m: int = 7_500) -> ee
 
     return dist_roads_m.addBands(dist_roads_log)
 
+
+def get_terrain_bands(roi: ee.Geometry) -> ee.Image:
+    """
+    Creates terrain-context feature bands from SRTM.
+
+    ELEVATION:
+        Absolute elevation in metres.
+
+    SLOPE:
+        Terrain gradient in degrees.
+
+    TPI_300M:
+        Topographic Position Index using a 300 m neighbourhood.
+        Positive values indicate terrain locally higher than surroundings.
+        Negative values indicate locally lower terrain.
+    """
+    dem = ee.Image("USGS/SRTMGL1_003").select("elevation").clip(roi)
+
+    elevation = (
+        dem
+        .rename("ELEVATION")
+        .toFloat()
+        .clip(roi)
+    )
+
+    slope = (
+        ee.Terrain.slope(dem)
+        .rename("SLOPE")
+        .toFloat()
+        .clip(roi)
+    )
+
+    elev_mean_300m = elevation.focal_mean(
+        radius=300,
+        units="meters",
+    )
+
+    tpi_300m = (
+        elevation
+        .subtract(elev_mean_300m)
+        .rename("TPI_300M")
+        .toFloat()
+        .clip(roi)
+    )
+
+    return elevation.addBands([slope, tpi_300m])
+
+
+def get_water_context_bands(roi: ee.Geometry) -> ee.Image:
+    """
+    Creates hydrological context bands from JRC Global Surface Water.
+
+    DIST_WATER_M:
+        Distance in metres to persistent surface water.
+
+    WATER_OCCURRENCE:
+        Historical percentage occurrence of surface water.
+    """
+    gsw = ee.Image("JRC/GSW1_4/GlobalSurfaceWater").clip(roi)
+
+    water_occurrence = (
+        gsw
+        .select("occurrence")
+        .unmask(0)
+        .rename("WATER_OCCURRENCE")
+        .toFloat()
+        .clip(roi)
+    )
+
+    # Persistent water mask. 80 means water was observed in at least 80%
+    # of valid observations.
+    persistent_water = water_occurrence.gte(80).selfMask()
+
+    # fastDistanceTransform returns squared distance in pixels.
+    # sqrt() converts to pixel distance, then multiply by scale gives metres.
+    dist_water_m = (
+        persistent_water
+        .fastDistanceTransform(neighborhood=1024, units="pixels")
+        .sqrt()
+        .multiply(CFG.SCALE_M)
+        .rename("DIST_WATER_M")
+        .toFloat()
+        .clip(roi)
+    )
+
+    return dist_water_m.addBands(water_occurrence)
+
+
 def main() -> int:
     # -
     # Init Earth Engine
     # -
     # ee.Authenticate()
-    EXPERIMENT_TAG = "with_slope_roads_and_water"
+
+    EXPERIMENT_TAG = "with_slope_roads_water_elevation_tpi"
+
     if CFG.FAIL_ON_MISSING_LABELS:
-        print("FAIL_ON_MISSING_LABELS=True → Only years with ESA WorldCover labels (2020=v100, 2021=v200) are allowed.")
+        print(
+            "FAIL_ON_MISSING_LABELS=True → Only years with ESA WorldCover labels "
+            "(2020=v100, 2021=v200) are allowed."
+        )
 
     ee.Initialize(project=CFG.EE_PROJECT)
     print("Earth Engine Initialised")
 
     # -
-    # ROI (from roi.py)
+    # ROI
     # -
     ROI, roi_meta = build_roi()
 
@@ -118,12 +218,13 @@ def main() -> int:
         debug_point_checks(ROI, sanity_cities)
 
     # -
-    # Submit tasks (one per year)
+    # Submit tasks
     # -
     tasks: list[ee.batch.Task] = []
 
     for year in tqdm(CFG.YEARS, desc="Submitting EE exports"):
         composite = get_annual_landsat_composite(year, ROI, debug=CFG.DEBUG)
+
         # -
         # Debug-only: export quick ROI overlay TIFF
         # -
@@ -131,8 +232,16 @@ def main() -> int:
             print("Composite bands:", composite.bandNames().getInfo())
             roi_fc = ee.FeatureCollection([ee.Feature(ROI)])
 
-            rgb_vis = composite.select(["RED", "GREEN", "BLUE"]).visualize(min=0.0, max=0.3)
-            roi_outline = ee.Image().byte().paint(roi_fc, 1, 3).visualize(palette=["FF0000"])
+            rgb_vis = composite.select(["RED", "GREEN", "BLUE"]).visualize(
+                min=0.0,
+                max=0.3,
+            )
+            roi_outline = (
+                ee.Image()
+                .byte()
+                .paint(roi_fc, 1, 3)
+                .visualize(palette=["FF0000"])
+            )
             debug_img = rgb_vis.blend(roi_outline)
 
             debug_desc = f"{CFG.ROI_EXPORT_DESC}_{EXPERIMENT_TAG}_{year}"
@@ -151,66 +260,65 @@ def main() -> int:
             tasks.append(debug_task)
             print(f"{year}: DEBUG TIFF task started -> {debug_task.status().get('state')}")
 
-        # Feature engineering (bands + indices)
+        # -
+        # Feature engineering: spectral bands + indices
+        # -
         blue = composite.select("BLUE")
         green = composite.select("GREEN")
         red = composite.select("RED")
         nir = composite.select("NIR")
         swir1 = composite.select("SWIR1")
 
-        # Small epsilon to avoid divide-by-zero edge cases
         eps = ee.Image.constant(1e-6)
 
-        # Existing indices
-        ndvi = nir.subtract(red).divide(nir.add(red).add(eps)).rename("NDVI")
-        ndbi = swir1.subtract(nir).divide(swir1.add(nir).add(eps)).rename("NDBI")
-        ndwi = green.subtract(nir).divide(green.add(nir).add(eps)).rename("NDWI")
-
-        # New: Normalised Difference Moisture Index (NDMI)
-        # Moisture in vegetation/land (helps wetlands + crop moisture separation)
-        ndmi = nir.subtract(swir1).divide(nir.add(swir1).add(eps)).rename("NDMI")
-
-        # New: Bare Soil Index (BSI)
-        # Exposed soil/bare ground signal (helps bare vs cropland vs built-up edges)
-        bsi_num = (swir1.add(red)).subtract(nir.add(blue))
-        bsi_den = (swir1.add(red)).add(nir.add(blue)).add(eps)
-        bsi = bsi_num.divide(bsi_den).rename("BSI")
-
-        # New: Terrain slope from SRTM DEM
-        # Static physical terrain feature, useful because land use is constrained
-        # by gradient/suitability as well as spectral surface appearance.
-        dem = ee.Image("USGS/SRTMGL1_003").select("elevation").clip(ROI)
-        slope = ee.Terrain.slope(dem).rename("SLOPE").toFloat()
-
-        # New: Road proximity from GRIP4 Europe
-        # Static infrastructure feature. This gives the classifier spatial context
-        # linked to accessibility, urban pressure and human land-use patterns.
-        road_distance = get_road_distance_bands(ROI)
-
-
-        # New: Distance to persistent surface water
-        # Uses JRC Global Surface Water occurrence.
-        # occurrence is 0-100, where higher values indicate more frequent historical water presence.
-        gsw = ee.Image("JRC/GSW1_4/GlobalSurfaceWater")
-        water_occurrence = gsw.select("occurrence").unmask(0).clip(ROI)
-
-        # Persistent water mask. 80 means water was observed in at least 80% of valid observations.
-        persistent_water = water_occurrence.gte(80).selfMask()
-
-        # Distance from each pixel to nearest persistent water pixel, in metres.
-        # fastDistanceTransform gives squared distance in pixels, so sqrt() * scale gives metres.
-        dist_water_m = (
-            persistent_water
-            .fastDistanceTransform(neighborhood=1024, units="pixels")
-            .sqrt()
-            .multiply(CFG.SCALE_M)
-            .rename("DIST_WATER_M")
+        ndvi = (
+            nir
+            .subtract(red)
+            .divide(nir.add(red).add(eps))
+            .rename("NDVI")
             .toFloat()
-            .clip(ROI)
         )
 
-        # Also keep occurrence itself as a contextual hydrology feature.
-        water_occurrence = water_occurrence.rename("WATER_OCCURRENCE").toFloat()
+        ndbi = (
+            swir1
+            .subtract(nir)
+            .divide(swir1.add(nir).add(eps))
+            .rename("NDBI")
+            .toFloat()
+        )
+
+        ndwi = (
+            green
+            .subtract(nir)
+            .divide(green.add(nir).add(eps))
+            .rename("NDWI")
+            .toFloat()
+        )
+
+        ndmi = (
+            nir
+            .subtract(swir1)
+            .divide(nir.add(swir1).add(eps))
+            .rename("NDMI")
+            .toFloat()
+        )
+
+        bsi_num = swir1.add(red).subtract(nir.add(blue))
+        bsi_den = swir1.add(red).add(nir.add(blue)).add(eps)
+
+        bsi = (
+            bsi_num
+            .divide(bsi_den)
+            .rename("BSI")
+            .toFloat()
+        )
+
+        # -
+        # Contextual feature bands
+        # -
+        terrain_bands = get_terrain_bands(ROI)
+        road_distance_bands = get_road_distance_bands(ROI)
+        water_context_bands = get_water_context_bands(ROI)
 
         features = composite.addBands([
             ndvi,
@@ -218,20 +326,20 @@ def main() -> int:
             ndwi,
             ndmi,
             bsi,
-            slope,
-            road_distance,
-            dist_water_m,
-            water_occurrence,
+            terrain_bands,
+            road_distance_bands,
+            water_context_bands,
         ])
 
         if CFG.DEBUG:
             print("Feature bands:", features.bandNames().getInfo())
-        # --- Labels (ESA WorldCover) ---
+
+        # -
+        # Labels: ESA WorldCover
+        # -
         if year == 2020:
-            # v100 contains 2020 (ImageCollection -> take the first image)
             worldcover = ee.ImageCollection("ESA/WorldCover/v100").first().select("Map")
         elif year == 2021:
-            # v200 contains 2021 (ImageCollection -> take the first image)
             worldcover = ee.ImageCollection("ESA/WorldCover/v200").first().select("Map")
         else:
             if CFG.FAIL_ON_MISSING_LABELS:
@@ -239,10 +347,11 @@ def main() -> int:
                     f"No ESA WorldCover labels available in v100/v200 for YEAR={year}. "
                     "WorldCover in EE covers 2020 (v100) and 2021 (v200)."
                 )
-            continue  # if you ever allow skipping
+            continue
 
         labels = (
-            worldcover.rename("label")   # <-- use rename, NOT name()
+            worldcover
+            .rename("label")
             .reduceResolution(reducer=ee.Reducer.mode(), maxPixels=1024)
             .reproject(crs="EPSG:4326", scale=CFG.SCALE_M)
             .clip(ROI)
@@ -260,7 +369,7 @@ def main() -> int:
         )
 
         # -
-        # Export CSV (always)
+        # Export CSV
         # -
         csv_desc = f"{CFG.EXPORT_DESC}_{EXPERIMENT_TAG}_{year}"
         csv_prefix = f"{CFG.EXPORT_PREFIX}_{EXPERIMENT_TAG}_{year}"
@@ -276,9 +385,6 @@ def main() -> int:
         tasks.append(csv_task)
         print(f"{year}: CSV task started -> {csv_task.status().get('state')}")
 
-    # -
-    # Optional: wait for completion (pipeline mode)
-    # -
     wait_for_tasks(tasks, poll_s=30)
     print("All EE tasks finished (COMPLETED/FAILED/CANCELLED).")
 
