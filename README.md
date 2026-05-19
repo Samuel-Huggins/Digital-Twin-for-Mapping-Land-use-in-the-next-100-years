@@ -179,3 +179,177 @@ Digital-Twin-for-Mapping-Land-use-in-the-next-100-years/
 ├── poetry.lock
 ├── .gitignore
 └── README.md
+```
+
+---
+
+## Setup
+
+### 1. Clone the repository
+
+```bash
+git clone <repository-url>
+cd Digital-Twin-for-Mapping-Land-use-in-the-next-100-years
+```
+
+### 2. Install dependencies
+
+```bash
+poetry install
+```
+
+### 3. Activate the environment
+
+```bash
+poetry shell
+```
+
+Alternatively, commands can be run directly with:
+
+```bash
+poetry run python -m <module_name>
+```
+
+### 4. Authenticate Google Earth Engine
+
+The project requires access to Google Earth Engine.
+
+```bash
+earthengine authenticate
+```
+
+Then initialise Earth Engine in the relevant export scripts.
+
+---
+
+## Main Commands
+
+### Export labelled WorldCover / Landsat samples
+
+```bash
+poetry run python -m LULC_digital_twin.data.worldcover_export
+```
+
+### Train the ANN classifier
+
+```bash
+poetry run python -m LULC_digital_twin.models.train_ann
+```
+
+### Generate predicted land-cover maps
+
+```bash
+poetry run python -m LULC_digital_twin.models.predict_map
+```
+
+### Generate change maps
+
+```bash
+poetry run python -m LULC_digital_twin.maps.change_map
+```
+
+### Apply majority-filter smoothing
+
+```bash
+poetry run python -m LULC_digital_twin.maps.smooth_map
+```
+
+### Run driver-weighted forward projection
+
+```bash
+poetry run python -m LULC_digital_twin.maps.project_driver_weighted
+```
+
+---
+
+## Outputs
+
+The system produces several types of output:
+
+- labelled training CSV files
+- trained ANN model files
+- classification reports
+- confusion matrices
+- training accuracy/loss plots
+- predicted land-cover GeoTIFFs
+- predicted land-cover PNG previews
+- smoothed prediction maps
+- 2020–2021 change maps
+- forward projection maps for future years
+- QGIS-styled visual artefacts for the final report and presentation
+
+Example output paths:
+
+```text
+results/with_slope_roads_and_water/
+results/projections_driver_weighted_neighbourhood/
+results/figures/
+```
+
+---
+
+## Observed Performance
+
+The best-performing experiments used spectral indices plus spatial drivers such as slope, distance to roads, distance to water, and elevation.
+
+Observed performance reached approximately:
+
+- **Overall accuracy:** around 0.69–0.70
+- **Strongest class performance:** water and some major land-cover classes
+- **Main confusion issue:** cropland versus bare/sparse vegetation
+- **Likely cause of confusion:** annual median Landsat composites over a heavily agricultural region
+
+The model’s performance should be interpreted as a prototype result rather than a production-grade land-cover classifier.
+
+---
+
+## Key Limitations
+
+The current system has several important limitations:
+
+### Limited labelled years
+
+ESA WorldCover provides usable labels for 2020 and 2021 only in this workflow. This restricts temporal validation and long-range forecasting confidence.
+
+### WorldCover as proxy ground truth
+
+ESA WorldCover is itself a classified product, not manually surveyed ground truth. Model evaluation is therefore against a benchmark map rather than direct field labels.
+
+### Agricultural seasonality
+
+East Anglia contains extensive agricultural land. Annual median composites can make cropland appear spectrally similar to bare/sparse vegetation.
+
+### Class imbalance
+
+Some classes, such as shrubland and wetland, are rare within the selected ROI. This makes per-class recall uneven.
+
+### Projection uncertainty
+
+Forward projection is exploratory. It demonstrates a digital-twin-style mechanism but does not claim validated 100-year predictive accuracy.
+
+---
+
+## Future Work
+
+Potential future improvements include:
+
+- adding more historical classified years
+- using Sentinel-2 data for higher spatial resolution
+- incorporating population, planning, infrastructure, and climate datasets
+- testing alternative models such as Random Forest, XGBoost, CNNs, or temporal models
+- improving validation with independent land-cover datasets
+- implementing scenario-based projection controls
+- developing an interactive dashboard or GUI
+- introducing a feedback loop where new observations update the model over time
+
+---
+
+## Academic Context
+
+This repository forms part of the supporting material for the UEA Final Year Computing Project portfolio. The final portfolio requires not only a written report, but also supporting artefacts such as source code, data, build instructions, and documentation explaining the structure of the submitted material.
+
+---
+
+## Disclaimer
+
+This project is a research prototype created for academic purposes. The generated maps and projections should not be used for planning, policy, environmental assessment, or commercial decision-making without further validation.
