@@ -316,7 +316,7 @@ def main() -> int:
             folder=CFG.EXPORT_FOLDER,
             fileNamePrefix=prefix,
             region=roi,
-            scale=90, #Reduced to 90m scale
+            scale=30, #Previously Reduced to 90m scale
             maxPixels=1e13,
             fileFormat="GeoTIFF",
         )
